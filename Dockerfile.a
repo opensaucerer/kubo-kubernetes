@@ -1,0 +1,95 @@
+FROM ubuntu:latest
+
+LABEL maintainer "Perfection <perfection@lighthouse.storage>"
+
+# update apt and install dependencies
+RUN apt-get update && \ 
+    apt-get install -y wget && \
+    rm -rf /var/lib/apt/lists/*
+
+
+# download and extract ipfs
+RUN wget https://dist.ipfs.io/go-ipfs/v0.13.0/go-ipfs_v0.13.0_linux-amd64.tar.gz && \
+    tar xvfz go-ipfs_v0.13.0_linux-amd64.tar.gz && \
+    mv go-ipfs/ipfs /usr/local/bin/ && \
+    rm go-ipfs_v0.13.0_linux-amd64.tar.gz && \
+    rm -rf go-ipfs
+
+# checkpoint --- echo ipfs version
+RUN ipfs version
+
+ENV IPFS_PATH /data/ipfs
+
+ENV API_PORT 5002
+ENV GATEWAY_PORT 8080
+ENV SWARM_PORT 4001
+
+EXPOSE ${SWARM_PORT}
+# This may introduce security risk to expose API_PORT public
+# EXPOSE ${API_PORT}
+EXPOSE ${GATEWAY_PORT}
+
+RUN mkdir -p ${IPFS_PATH} 
+
+# no need to for this as docker runs in root user mode
+# RUN chown ubuntu:ubuntu ${IPFS_PATH}
+
+# configure ipfs for production
+RUN ipfs init -p flatfs,server && \
+    ipfs config Datastore.StorageMax 30GB && \
+    ipfs config Addresses.Gateway /ip4/0.0.0.0/tcp/8080 && \
+    ipfs config --json Datastore.BloomFilterSize 1048576 && \
+    ipfs config Datastore.GCPeriod "10s" && \
+    # ipfs config --json Datastore.StorageGCWatermark 60 && \
+    ipfs config --json Experimental.AcceleratedDHTClient false && \
+    # ipfs config --json Experimental.FileStoreEnabled false && \
+    ipfs config Reprovider.Interval "0" && \
+    ipfs config Reprovider.Strategy "roots" && \
+    ipfs config Swarm.Reprovider.Strategy "roots" && \
+    ipfs config Swarm.ConnMgr.Type "basic" && \
+    ipfs config --json Swarm.ConnMgr.LowWater 10 && \
+    ipfs config --json Swarm.ConnMgr.HighWater 30 && \
+    ipfs config Swarm.ConnMgr.GracePeriod "5s" && \
+    ipfs config --json Swarm.RelayClient.Enabled false && \
+    ipfs config --json Swarm.RelayService.Enabled false
+
+
+# pull and install Golang
+RUN wget https://dl.google.com/go/go1.18.3.linux-amd64.tar.gz && \
+    tar xvfz go1.18.3.linux-amd64.tar.gz && \
+    mv go /usr/local && \
+    rm go1.18.3.linux-amd64.tar.gz
+
+# install make and build-essential tools to compile ipfs-s3
+RUN apt update -y && \
+    apt install make -y && \
+    apt install build-essential -y
+
+# export env into ubuntu root environment context
+RUN export PATH=$PATH:/usr/local/go/bin && \
+    export GOPATH=/home/ubuntu/go
+
+RUN apt-get update &&\
+    apt-get install -y git &&\
+    git --version
+
+# pull and build ipfs-s3
+RUN git clone https://github.com/ipfs/go-ds-s3.git 
+
+ENV PATH $PATH:/usr/local/go/bin
+ENV GOPATH /home/ubuntu/go
+ENV IPFS_VERSION v0.13.0
+
+RUN cd go-ds-s3 && \ 
+    ls && \
+    make build && \
+    make install
+    # && \ sudo mv go-ds-s3.so /data/ipfs/plugins
+
+# TODO: change bucket name
+RUN ipfs config --json Datastore.Spec.mounts "[{\"child\":{\"type\":\"s3ds\",\"region\":\"ap-south-1\",\"bucket\":\"ipfs-gateway\",\"accessKey\":\"AKIAQXSPXV3OH76NDFWW\",\"secretKey\":\"udv+G35HN5jn7x9458x9TPofkdTQPF+4\/B7m808V\"},\"mountpoint\":\"\/blocks\",\"prefix\":\"s3.datastore\",\"type\":\"measure\"},{\"child\":{\"compression\":\"none\",\"path\":\"datastore\",\"type\":\"levelds\"},\"mountpoint\":\"\/\",\"prefix\":\"leveldb.datastore\",\"type\":\"measure\"}]"
+
+RUN echo '{"mounts":[{"bucket":"ipfs-gateway","mountpoint":"/blocks","region":"ap-south-1","rootDirectory":""},{"mountpoint":"/","path":"datastore","type":"levelds"}],"type":"mount"}' >> /data/ipfs/datastore_spec
+
+# by default, run `ipfs daemon` to start as a running node
+ENTRYPOINT ipfs daemon --enable-gc --routing dhtclient

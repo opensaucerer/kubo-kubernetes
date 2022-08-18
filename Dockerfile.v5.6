@@ -1,0 +1,53 @@
+FROM ubuntu:latest
+
+LABEL maintainer "Perfection <perfection@lighthouse.storage>"
+
+# update apt and install dependencies
+RUN apt-get update && \ 
+    apt-get install -y wget && \
+    rm -rf /var/lib/apt/lists/*
+
+
+# download and extract ipfs
+RUN wget https://dist.ipfs.io/go-ipfs/v0.4.22/go-ipfs_v0.4.22_linux-amd64.tar.gz && \
+    tar xvfz go-ipfs_v0.4.22_linux-amd64.tar.gz && \
+    mv go-ipfs/ipfs /usr/local/bin/ && \
+    rm go-ipfs_v0.4.22_linux-amd64.tar.gz && \
+    rm -rf go-ipfs
+
+# checkpoint --- echo ipfs version
+RUN ipfs version
+
+ENV IPFS_PATH /data/ipfs
+
+ENV API_PORT 5002
+ENV GATEWAY_PORT 8080
+ENV SWARM_PORT 4001
+
+EXPOSE ${SWARM_PORT}
+# This may introduce security risk to expose API_PORT public
+# EXPOSE ${API_PORT}
+EXPOSE ${GATEWAY_PORT}
+
+RUN mkdir -p ${IPFS_PATH} 
+
+# no need to for this as docker runs in root user mode
+# RUN chown ubuntu:ubuntu ${IPFS_PATH}
+
+# configure ipfs for production
+RUN ipfs init -p lowpower && \
+    ipfs config Datastore.StorageMax 30GB && \
+    ipfs config Addresses.Gateway /ip4/0.0.0.0/tcp/8080 && \
+    ipfs config Reprovider.Interval "0" && \
+    # ipfs config Reprovider.Strategy "root" && \
+    ipfs config --json Datastore.BloomFilterSize 1048576 && \
+    ipfs config --json Swarm.ConnMgr.LowWater 60 && \
+    ipfs config --json Swarm.ConnMgr.HighWater 100
+
+
+# use this is you want to start a daemon in the background
+# RUN echo "ipfs init done" >> /lib/systemd/system/ipfs.service
+
+
+# by default, run `ipfs daemon` to start as a running node
+ENTRYPOINT ipfs daemon --enable-gc

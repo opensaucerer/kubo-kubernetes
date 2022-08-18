@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ipfs-kube-gateway-service
+  labels:
+    app: ipfs-kube-gateway
+spec:
+  type: LoadBalancer
+  selector:
+    app: ipfs-kube-gateway
+  ports:
+    - name: swarm
+      targetPort: 4001
+      port: 4001
+    - name: http
+      targetPort: 8080
+      port: 8080

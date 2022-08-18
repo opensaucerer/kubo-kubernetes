@@ -1,0 +1,73 @@
+FROM ubuntu:latest
+
+LABEL maintainer "Perfection <perfection@lighthouse.storage>"
+
+# update apt and install dependencies
+RUN apt-get update && \ 
+    apt-get install -y wget && \
+    rm -rf /var/lib/apt/lists/*
+
+
+# download and extract ipfs
+RUN wget https://dist.ipfs.io/go-ipfs/v0.13.0/go-ipfs_v0.13.0_linux-386.tar.gz && \
+    tar xvfz go-ipfs_v0.13.0_linux-386.tar.gz && \
+    mv go-ipfs/ipfs /usr/local/bin/ && \
+    rm go-ipfs_v0.13.0_linux-386.tar.gz && \
+    rm -rf go-ipfs
+
+# checkpoint --- echo ipfs version
+RUN ipfs version
+
+ENV IPFS_PATH /data/ipfs
+
+ENV API_PORT 5002
+ENV GATEWAY_PORT 8080
+ENV SWARM_PORT 4001
+
+EXPOSE ${SWARM_PORT}
+# This may introduce security risk to expose API_PORT public
+# EXPOSE ${API_PORT}
+EXPOSE ${GATEWAY_PORT}
+
+RUN mkdir -p ${IPFS_PATH} 
+
+# no need to for this as docker runs in root user mode
+# RUN chown ubuntu:ubuntu ${IPFS_PATH}
+
+# configure ipfs for production
+RUN ipfs init -p server && \
+    ipfs config Datastore.StorageMax 10GB && \
+    ipfs config Addresses.Gateway /ip4/127.0.0.1/tcp/8080
+
+
+# use this is you want to start a daemon in the background
+# RUN echo "ipfs init done" >> /lib/systemd/system/ipfs.service
+
+# # pull and install Golang
+# RUN wget https://dl.google.com/go/go1.12.7.linux-amd64.tar.gz && \
+#     tar xvfz go1.12.7.linux-amd64.tar.gz && \
+#     sudo mv go /usr/local && \
+#     rm go1.12.7.linux-amd64.tar.gz
+
+# # install make and build-essential tools to compile ipfs-s3
+# RUN sudo apt update && \
+#     sudo apt install make && \
+#     sudo apt install build-essential
+
+# # export env into ubuntu root environment context
+# RUN export PATH=$PATH:/usr/local/go/bin && \
+#     export GOPATH=/home/ubuntu/go
+
+# # pull and build ipfs-s3
+# RUN git clone https://github.com/ipfs/go-ds-s3.git && \
+#     cd go-ds-s3 && \
+#     make build && \
+#     make install
+#     # && \ sudo mv go-ds-s3.so /data/ipfs/plugins
+
+# # TODO: change bucket name
+# RUN ipfs config --json Datastore.Spec.mounts "[{\"child\":{\"type\":\"s3ds\",\"region\":\"ap-south-1\",\"bucket\":\"$bucketname\",\"accessKey\":\"AKIAQXSPXV3OH76NDFWW\",\"secretKey\":\"udv+G35HN5jn7x9458x9TPofkdTQPF+4\/B7m808V\"},\"mountpoint\":\"\/blocks\",\"prefix\":\"s3.datastore\",\"type\":\"measure\"},{\"child\":{\"compression\":\"none\",\"path\":\"datastore\",\"type\":\"levelds\"},\"mountpoint\":\"\/\",\"prefix\":\"leveldb.datastore\",\"type\":\"measure\"}]"
+
+
+# by default, run `ipfs daemon` to start as a running node
+ENTRYPOINT ipfs daemon --enable-gc
