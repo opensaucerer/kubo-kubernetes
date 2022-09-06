@@ -66,7 +66,7 @@ RUN ipfs init -p server && \
 #     # && \ sudo mv go-ds-s3.so /data/ipfs/plugins
 
 # # TODO: change bucket name
-# RUN ipfs config --json Datastore.Spec.mounts "[{\"child\":{\"type\":\"s3ds\",\"region\":\"ap-south-1\",\"bucket\":\"$bucketname\",\"accessKey\":\"AKIAQXSPXV3OH76NDFWW\",\"secretKey\":\"udv+G35HN5jn7x9458x9TPofkdTQPF+4\/B7m808V\"},\"mountpoint\":\"\/blocks\",\"prefix\":\"s3.datastore\",\"type\":\"measure\"},{\"child\":{\"compression\":\"none\",\"path\":\"datastore\",\"type\":\"levelds\"},\"mountpoint\":\"\/\",\"prefix\":\"leveldb.datastore\",\"type\":\"measure\"}]"
+# RUN ipfs config --json Datastore.Spec.mounts "[{\"child\":{\"type\":\"s3ds\",\"region\":\"ap-south-1\",\"bucket\":\"$bucketname\",\"accessKey\":\"$ACCESS_kEY\",\"secretKey\":\"$SECRET_KEY\"},\"mountpoint\":\"\/blocks\",\"prefix\":\"s3.datastore\",\"type\":\"measure\"},{\"child\":{\"compression\":\"none\",\"path\":\"datastore\",\"type\":\"levelds\"},\"mountpoint\":\"\/\",\"prefix\":\"leveldb.datastore\",\"type\":\"measure\"}]"
 
 
 # by default, run `ipfs daemon` to start as a running node
